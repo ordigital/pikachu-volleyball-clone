@@ -1,0 +1,18 @@
+# Pikachu Volleyball Clone
+
+> A fan-made, free HD remake of the classic 1997 Pikachu Volleyball beach game (SACHI SOFT / SAWAYAKAN Programmers and Satoshi Takenouchi), written in Rust. One or two players, widescreen court. Not affiliated with or endorsed by Nintendo, The Pokémon Company or the original authors.
+
+Platforms: Linux (x86-64 and ARM64 AppImage), Windows x64, Android 5.0+, a WebAssembly browser version, and independent ports for the Sega Mega Drive / Genesis and the NES. The project is open source; the starting point was the browser implementation by gorisanson.
+
+## Play and download
+- [Website (play in the browser, downloads)](https://ordigital.github.io/pikachu-volleyball-clone/): landing page in English, with translations at /pl/, /de/, /fr/, /es/, /it/, /uk/, /ru/ and /hu/
+- [Latest release](https://github.com/ordigital/pikachu-volleyball-clone/releases/latest): AppImages, Windows ZIP, Android APK, Mega Drive and NES ROMs, SHA256SUMS.txt
+
+## Source and documentation
+- [Repository](https://github.com/ordigital/pikachu-volleyball-clone): Rust sources, build instructions, controls
+- [Mega Drive port](https://github.com/ordigital/pikachu-volleyball-clone/tree/main/ports/megadrive): C / SGDK
+- [NES port](https://github.com/ordigital/pikachu-volleyball-clone/tree/main/ports/nes): C and 6502 assembly, MMC3
+- [Browser port](https://github.com/ordigital/pikachu-volleyball-clone/tree/main/ports/browser): WebAssembly build
+
+## Support
+- [Buy me a coffee](https://buymeacoffee.com/adamstrad)

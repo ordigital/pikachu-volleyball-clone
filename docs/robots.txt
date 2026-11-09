@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://ordigital.github.io/pikachu-volleyball-clone/sitemap.xml

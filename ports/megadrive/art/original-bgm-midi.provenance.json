@@ -1,0 +1,11 @@
+{
+  "source_filename": "Pokemon_20.exe",
+  "source_sha256": "ac41ba2d1dc4daf5fdf2d3cf91110650598cb08e10a0c868908f5166c5b5a5d2",
+  "resource": "MIDS/BGM/1041",
+  "mids_sha256": "a2c7768771889e47fd795d08c65f100bd99768ccaa85e9b0f80a64e881ca44a8",
+  "midi_sha256": "75e52922e99d6329c304ed9dcf5e403b74a73050a218c996745cb689fe99cfe3",
+  "division": 48,
+  "events": 4541,
+  "ticks": 9990,
+  "method": "Lossless stream-to-SMF conversion; no audio transcription or EXE execution."
+}

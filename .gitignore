@@ -1,0 +1,14 @@
+/target
+
+__pycache__/
+*.py[cod]
+
+# Local authoring tools and vector sources; the game embeds final PNG assets.
+/tools/
+
+# Local agent index
+/AGENTS.md
+ports/browser/dist/
+
+# Local release packages
+/release/

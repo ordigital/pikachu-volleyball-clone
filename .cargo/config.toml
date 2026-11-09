@@ -1,0 +1,4 @@
+# Browser build: the extern "C" functions of the JS plugins (ports/browser) are imports of the
+# wasm module, resolved by miniquad's loader at instantiation time.
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "link-arg=--import-undefined"]

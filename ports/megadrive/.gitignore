@@ -1,0 +1,15 @@
+/out/
+/res/*.h
+/res/*.rs
+/res/*.d
+/src/boot/*
+!/src/boot/rom_head.c
+/src/drv_pcm4.s
+/src/drv_pcm4.o80
+
+# SGDK resource-compiler / bintos diagnostics
+/res/*_opt.png
+/src/drv_pcm4.h
+
+# Optional local asset/music authoring tools.
+/tools/

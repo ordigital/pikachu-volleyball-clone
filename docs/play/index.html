@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Pikachu Volleyball Clone</title>
+<meta name="description" content="Play the HD remake of Pikachu Volleyball in your browser.">
+<meta name="robots" content="noindex">
+<style>
+html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+#glcanvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; outline: none; touch-action: none; background: #000; }
+#start { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  background: rgba(10, 40, 14, .88); color: #fff; font: 700 22px/1.3 system-ui, sans-serif; text-align: center; cursor: pointer; z-index: 2; padding: 20px; }
+#start strong { font-size: 30px; color: #ffe000; }
+#start small { font-weight: 400; font-size: 15px; opacity: .85; }
+#start[hidden] { display: none; }
+</style>
+</head>
+<body>
+<canvas id="glcanvas" tabindex="1"></canvas>
+<div id="start"><strong>Pikachu Volleyball Clone</strong><span id="start-text">Loading…</span><small>Click, tap or press a key to start</small></div>
+<script src="gl.js"></script>
+<script src="pika_audio.js"></script>
+<script>
+"use strict";
+(function () {
+    var overlay = document.getElementById("start");
+    var text = document.getElementById("start-text");
+    var started = false;
+    function unlock() {
+        if (window.pika_audio_unlock) window.pika_audio_unlock();
+        if (!started) {
+            started = true;
+            overlay.hidden = true;
+        }
+        // Inside an iframe the click would otherwise leave focus on the page body.
+        window.focus();
+        canvas.focus();
+        setTimeout(function () { window.focus(); canvas.focus(); }, 0);
+    }
+    ["pointerdown", "pointerup", "click", "touchend", "keydown"].forEach(function (name) {
+        window.addEventListener(name, unlock, true);
+    });
+    text.textContent = "Ready";
+    // F11 and Alt+Enter toggle full screen of the page (the game itself has no menu bar here).
+    window.addEventListener("keydown", function (event) {
+        if (event.key === "F11" || (event.altKey && event.key === "Enter")) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            } else if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen();
+            }
+        }
+    }, true);
+    document.addEventListener("contextmenu", function (event) { event.preventDefault(); });
+    // Screenshot test mode (?shot=<ms>): after the delay, POST the canvas and the console log.
+    var match = /[?&]shot=(\d+)/.exec(location.search);
+    if (match) {
+        var logs = [];
+        ["log", "warn", "error"].forEach(function (level) {
+            var original = console[level];
+            console[level] = function () {
+                logs.push(level + ": " + Array.prototype.join.call(arguments, " "));
+                original.apply(console, arguments);
+            };
+        });
+        window.addEventListener("error", function (e) { logs.push("uncaught: " + e.message); });
+        // &ops=[[ms,"key","KeyZ",true],[ms,"click",x,y]] injects keyboard / mouse events on the canvas.
+        var ops = /[?&]ops=([^&]*)/.exec(location.search);
+        if (ops) {
+            JSON.parse(decodeURIComponent(ops[1])).forEach(function (op) {
+                setTimeout(function () {
+                    if (op[1] === "key") {
+                        canvas.dispatchEvent(new KeyboardEvent(op[3] ? "keydown" : "keyup",
+                            { code: op[2], key: op[2], bubbles: true, cancelable: true }));
+                    } else if (op[1] === "click") {
+                        var init = { clientX: op[2], clientY: op[3], button: 0, bubbles: true, cancelable: true };
+                        canvas.dispatchEvent(new MouseEvent("mousemove", init));
+                        canvas.dispatchEvent(new MouseEvent("mousedown", init));
+                        canvas.dispatchEvent(new MouseEvent("mouseup", init));
+                    }
+                }, op[0]);
+            });
+        }
+        setTimeout(function () {
+            overlay.hidden = true;
+            setTimeout(function () {
+                logs.push("audio: " + (window.pika_audio_state ? window.pika_audio_state() : "n/a"));
+                canvas.toBlob(function (blob) {
+                    fetch("/shot", { method: "POST", body: blob }).then(function () {
+                        return fetch("/log", { method: "POST", body: logs.join("\n") });
+                    });
+                }, "image/png");
+            }, 400);
+        }, parseInt(match[1], 10));
+    }
+    load("pikachu-volleyball.wasm");
+})();
+</script>
+</body>
+</html>

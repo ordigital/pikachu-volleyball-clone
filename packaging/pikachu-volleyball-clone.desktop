@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Pikachu Volleyball Clone
+Comment=Play volleyball against a friend or the computer
+Exec=pikachu-volleyball
+Icon=pikachu-volleyball-clone
+Categories=Game;SportsGame;
+Terminal=false

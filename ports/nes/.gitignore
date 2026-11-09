@@ -1,0 +1,7 @@
+/out/
+
+# Optional local asset authoring tools (the final CHR/nametable/audio binaries are in res/).
+/tools/
+
+__pycache__/
+*.py[cod]
