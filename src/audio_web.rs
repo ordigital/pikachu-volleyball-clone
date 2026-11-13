@@ -28,8 +28,8 @@ enum MusicTrack {
 impl MusicTrack {
     fn id(self) -> u32 {
         match self {
-            Self::Menu => 7,
-            Self::Game => 8,
+            Self::Menu => 12,
+            Self::Game => 13,
         }
     }
 
@@ -52,7 +52,7 @@ pub struct PikaAudio {
 
 impl PikaAudio {
     pub fn new() -> Self {
-        let sounds: [&[u8]; 9] = [
+        let sounds: [&[u8]; 14] = [
             include_bytes!("../assets/sounds/WAVE140_1.wav"),
             include_bytes!("../assets/sounds/WAVE141_1.wav"),
             include_bytes!("../assets/sounds/WAVE142_1.wav"),
@@ -60,6 +60,11 @@ impl PikaAudio {
             include_bytes!("../assets/sounds/WAVE144_1.wav"),
             include_bytes!("../assets/sounds/WAVE145_1.wav"),
             include_bytes!("../assets/sounds/WAVE146_1.wav"),
+            include_bytes!("../assets/sounds/WAVE140_2.wav"),
+            include_bytes!("../assets/sounds/WAVE141_2.wav"),
+            include_bytes!("../assets/sounds/WAVE142_2.wav"),
+            include_bytes!("../assets/sounds/WAVE143_2.wav"),
+            include_bytes!("../assets/sounds/WAVE144_2.wav"),
             include_bytes!("../assets/sounds/menu.ogg"),
             include_bytes!("../assets/sounds/bgm.ogg"),
         ];
@@ -75,14 +80,23 @@ impl PikaAudio {
 
     /// `left_or_center_or_right`: -1 left, 0 centre, 1 right channel.
     pub fn play(&self, snd: Snd, left_or_center_or_right: i32) {
-        let id = match snd {
-            Snd::Pipikachu => 0,
-            Snd::Pika => 1,
-            Snd::Chu => 2,
-            Snd::Pi => 3,
-            Snd::Pikachu => 4,
-            Snd::PowerHit => 5,
-            Snd::BallTouchesGround => 6,
+        self.play_alt(snd, left_or_center_or_right, false);
+    }
+
+    pub fn play_alt(&self, snd: Snd, left_or_center_or_right: i32, alt: bool) {
+        let id = match (snd, alt) {
+            (Snd::Pipikachu, false) => 0,
+            (Snd::Pika, false) => 1,
+            (Snd::Chu, false) => 2,
+            (Snd::Pi, false) => 3,
+            (Snd::Pikachu, false) => 4,
+            (Snd::PowerHit, _) => 5,
+            (Snd::BallTouchesGround, _) => 6,
+            (Snd::Pipikachu, true) => 7,
+            (Snd::Pika, true) => 8,
+            (Snd::Chu, true) => 9,
+            (Snd::Pi, true) => 10,
+            (Snd::Pikachu, true) => 11,
         };
         let pan = match left_or_center_or_right {
             -1 => -0.75,

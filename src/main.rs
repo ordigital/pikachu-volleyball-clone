@@ -7,7 +7,7 @@
 //!   Gracz 1: D (lewo), G (prawo), R (góra), F (dół), Z (uderzenie / wybór)
 //!   Gracz 2: strzałki, Enter (uderzenie / wybór)
 //!   Pad: D-pad + przycisk A (przypisanie pada do gracza w Controls)
-//! Skróty: P – pauza, F1 – restart,
+//! Skróty: P – pauza, F1 – restart, Backspace – skórki graczy,
 //!   Alt+Enter / F11 – pełny ekran
 
 mod audio;
@@ -177,13 +177,15 @@ async fn main() {
                 if logical.x >= 410.0 && logical.y >= 270.0 {
                     #[cfg(target_os = "android")]
                     android_call("openSupport");
-                } else if (220.0..=430.0).contains(&logical.x) {
-                    if (166.0..200.0).contains(&logical.y) {
+                } else if (200.0..=440.0).contains(&logical.x) {
+                    if (153.0..183.0).contains(&logical.y) {
                         game.request_touch_start(false);
-                    } else if (200.0..231.0).contains(&logical.y) {
+                    } else if (183.0..213.0).contains(&logical.y) {
                         touch.right_handed = !touch.right_handed;
                         game.set_android_mode(touch.right_handed);
-                    } else if (231.0..263.0).contains(&logical.y) {
+                    } else if (213.0..243.0).contains(&logical.y) {
+                        game.cycle_skins_mode();
+                    } else if (243.0..275.0).contains(&logical.y) {
                         #[cfg(target_os = "android")]
                         android_call("quitGame");
                         break 'main;
@@ -192,11 +194,14 @@ async fn main() {
             }
         }
         if !on_android && game.is_menu() && !modal {
-            if let Some(point) = touches()
+            let mut click_point = touches()
                 .iter()
                 .find(|t| t.phase == TouchPhase::Ended)
-                .map(|t| t.position / touch_dpi)
-            {
+                .map(|t| t.position / touch_dpi);
+            if click_point.is_none() && is_mouse_button_pressed(MouseButton::Left) {
+                click_point = Some(mouse_position().into());
+            }
+            if let Some(point) = click_point {
                 let menu_h = ui.menu_height(fullscreen);
                 let available_h = screen_height() - menu_h;
                 let scale = (screen_width() / SCREEN_W).min(available_h / SCREEN_H);
@@ -206,11 +211,13 @@ async fn main() {
                         menu_h + (available_h - SCREEN_H * scale) * 0.5,
                     ))
                     / scale;
-                if (220.0..=430.0).contains(&logical.x) {
-                    if (166.0..202.0).contains(&logical.y) {
+                if (200.0..=440.0).contains(&logical.x) {
+                    if (160.0..191.0).contains(&logical.y) {
                         game.request_touch_start(false);
-                    } else if (202.0..238.0).contains(&logical.y) {
+                    } else if (191.0..223.0).contains(&logical.y) {
                         game.request_touch_start(true);
+                    } else if (223.0..255.0).contains(&logical.y) {
+                        game.cycle_skins_mode();
                     }
                 }
             }

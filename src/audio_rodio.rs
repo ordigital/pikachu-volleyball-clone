@@ -126,11 +126,11 @@ pub struct PikaAudio {
     _stream: Option<OutputStream>,
     handle: Option<OutputStreamHandle>,
 
-    pipikachu: StereoSound,
-    pika: StereoSound,
-    chu: StereoSound,
-    pi: StereoSound,
-    pikachu: StereoSound,
+    pipikachu: [StereoSound; 2],
+    pika: [StereoSound; 2],
+    chu: [StereoSound; 2],
+    pi: [StereoSound; 2],
+    pikachu: [StereoSound; 2],
     power_hit: StereoSound,
     ball_touches_ground: StereoSound,
 
@@ -152,11 +152,26 @@ impl PikaAudio {
         Self {
             _stream: stream,
             handle,
-            pipikachu: StereoSound::from_wav(include_bytes!("../assets/sounds/WAVE140_1.wav")),
-            pika: StereoSound::from_wav(include_bytes!("../assets/sounds/WAVE141_1.wav")),
-            chu: StereoSound::from_wav(include_bytes!("../assets/sounds/WAVE142_1.wav")),
-            pi: StereoSound::from_wav(include_bytes!("../assets/sounds/WAVE143_1.wav")),
-            pikachu: StereoSound::from_wav(include_bytes!("../assets/sounds/WAVE144_1.wav")),
+            pipikachu: [
+                StereoSound::from_wav(include_bytes!("../assets/sounds/WAVE140_1.wav")),
+                StereoSound::from_wav(include_bytes!("../assets/sounds/WAVE140_2.wav")),
+            ],
+            pika: [
+                StereoSound::from_wav(include_bytes!("../assets/sounds/WAVE141_1.wav")),
+                StereoSound::from_wav(include_bytes!("../assets/sounds/WAVE141_2.wav")),
+            ],
+            chu: [
+                StereoSound::from_wav(include_bytes!("../assets/sounds/WAVE142_1.wav")),
+                StereoSound::from_wav(include_bytes!("../assets/sounds/WAVE142_2.wav")),
+            ],
+            pi: [
+                StereoSound::from_wav(include_bytes!("../assets/sounds/WAVE143_1.wav")),
+                StereoSound::from_wav(include_bytes!("../assets/sounds/WAVE143_2.wav")),
+            ],
+            pikachu: [
+                StereoSound::from_wav(include_bytes!("../assets/sounds/WAVE144_1.wav")),
+                StereoSound::from_wav(include_bytes!("../assets/sounds/WAVE144_2.wav")),
+            ],
             power_hit: StereoSound::from_wav(include_bytes!("../assets/sounds/WAVE145_1.wav")),
             ball_touches_ground: StereoSound::from_wav(include_bytes!(
                 "../assets/sounds/WAVE146_1.wav"
@@ -170,16 +185,21 @@ impl PikaAudio {
 
     /// `left_or_center_or_right`: -1 lewy, 0 środek, 1 prawy kanał
     pub fn play(&self, snd: Snd, left_or_center_or_right: i32) {
+        self.play_alt(snd, left_or_center_or_right, false);
+    }
+
+    pub fn play_alt(&self, snd: Snd, left_or_center_or_right: i32, alt: bool) {
         let handle = match &self.handle {
             Some(h) => h,
             None => return,
         };
+        let idx = usize::from(alt);
         let s = match snd {
-            Snd::Pipikachu => &self.pipikachu,
-            Snd::Pika => &self.pika,
-            Snd::Chu => &self.chu,
-            Snd::Pi => &self.pi,
-            Snd::Pikachu => &self.pikachu,
+            Snd::Pipikachu => &self.pipikachu[idx],
+            Snd::Pika => &self.pika[idx],
+            Snd::Chu => &self.chu[idx],
+            Snd::Pi => &self.pi[idx],
+            Snd::Pikachu => &self.pikachu[idx],
             Snd::PowerHit => &self.power_hit,
             Snd::BallTouchesGround => &self.ball_touches_ground,
         };
@@ -273,6 +293,28 @@ mod tests {
             assert_eq!(track.volume(false, 0.5), 0.0);
             assert_eq!(track.volume(true, 0.5), volume * 0.5);
             assert_eq!(track.volume(true, 0.0), 0.0);
+        }
+    }
+
+    #[test]
+    fn all_sound_effects_decode_correctly() {
+        for bytes in [
+            include_bytes!("../assets/sounds/WAVE140_1.wav").as_slice(),
+            include_bytes!("../assets/sounds/WAVE140_2.wav").as_slice(),
+            include_bytes!("../assets/sounds/WAVE141_1.wav").as_slice(),
+            include_bytes!("../assets/sounds/WAVE141_2.wav").as_slice(),
+            include_bytes!("../assets/sounds/WAVE142_1.wav").as_slice(),
+            include_bytes!("../assets/sounds/WAVE142_2.wav").as_slice(),
+            include_bytes!("../assets/sounds/WAVE143_1.wav").as_slice(),
+            include_bytes!("../assets/sounds/WAVE143_2.wav").as_slice(),
+            include_bytes!("../assets/sounds/WAVE144_1.wav").as_slice(),
+            include_bytes!("../assets/sounds/WAVE144_2.wav").as_slice(),
+            include_bytes!("../assets/sounds/WAVE145_1.wav").as_slice(),
+            include_bytes!("../assets/sounds/WAVE146_1.wav").as_slice(),
+        ] {
+            let (rate, samples) = parse_wav(bytes);
+            assert_eq!(rate, 22050);
+            assert!(!samples.is_empty());
         }
     }
 }

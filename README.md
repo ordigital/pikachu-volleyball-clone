@@ -62,9 +62,13 @@ digits after font-atlas growth. See [the patch notes](vendor/miniquad/PATCHES.md
 ## How to play
 
 Choose **1 Player** to play against the computer or **2 Players** for a local
-match. Move and jump to keep the ball in play, and use the power hit to send it
+match. Before starting, use the menu option (or click / tap it) to cycle the
+character matchup: **Pikachu** or **Charmander** for either side (`CHARMANDER VS. PIKACHU`,
+`CHARMANDER VS. CHARMANDER`, `PIKACHU VS. CHARMANDER`, or `PIKACHU VS. PIKACHU`),
+each featuring custom animation frames and authentic voice sound effects.
+Move and jump to keep the ball in play, and use the power hit to send it
 past your opponent. Score points by landing the ball on their side; the first to
-reach the selected score wins.
+reach 15 points wins.
 
 After 30 seconds without player input, the menu starts an automatic demo. Menu
 music fades out before the demo or after confirming the player selection; use

@@ -19,6 +19,42 @@ const MENU_LOGO_SCALE: f64 = 244.0 / 276.0;
 
 // MenuView
 
+/// Tryby zestawienia zawodników (Charmander vs. Pikachu itp. – wybierane w menu).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PlayerSkinsMode {
+    LeftAltRightClassic = 0, // Charmander vs. Pikachu
+    BothAlt = 1,             // Charmander vs. Charmander
+    LeftClassicRightAlt = 2, // Pikachu vs. Charmander
+    BothClassic = 3,         // Pikachu vs. Pikachu
+}
+
+impl PlayerSkinsMode {
+    pub const DEFAULT: Self = Self::LeftAltRightClassic;
+
+    pub fn next(self) -> Self {
+        match self {
+            Self::LeftAltRightClassic => Self::BothAlt,
+            Self::BothAlt => Self::LeftClassicRightAlt,
+            Self::LeftClassicRightAlt => Self::BothClassic,
+            Self::BothClassic => Self::LeftAltRightClassic,
+        }
+    }
+
+    pub fn menu_index(self) -> usize {
+        self as usize
+    }
+
+    /// (lewy_uzywa_players2, prawy_uzywa_players2)
+    pub fn alt_flags(self) -> (bool, bool) {
+        match self {
+            Self::LeftAltRightClassic => (true, false),
+            Self::BothAlt => (true, true),
+            Self::LeftClassicRightAlt => (false, true),
+            Self::BothClassic => (false, false),
+        }
+    }
+}
+
 pub struct MenuView {
     visible: bool,
     background: Texture2D,
@@ -28,11 +64,13 @@ pub struct MenuView {
     subtitle: Sprite,
     pikachu_volleyball: Sprite,
     with_who: [Sprite; 2],
+    matchup: [Sprite; 4],
     mobile_mode: [Sprite; 2],
     mobile_quit: Sprite,
     mobile_right_handed: bool,
     fight: Sprite,
 
+    skins_mode: PlayerSkinsMode,
     selected_with_who: i32,
     selected_with_who_message_size_increment: i32,
 }
@@ -78,6 +116,13 @@ impl MenuView {
                 Sprite::new(assets, "messages/ja/mode_right.png", 0.5, 0.5),
                 Sprite::new(assets, "messages/ja/mode_left.png", 0.5, 0.5),
             ],
+            matchup: [
+                Sprite::new(assets, "messages/matchup/0.png", 0.5, 0.5),
+                Sprite::new(assets, "messages/matchup/1.png", 0.5, 0.5),
+                Sprite::new(assets, "messages/matchup/2.png", 0.5, 0.5),
+                Sprite::new(assets, "messages/matchup/3.png", 0.5, 0.5),
+            ],
+            skins_mode: PlayerSkinsMode::DEFAULT,
             mobile_quit: Sprite::new(assets, "messages/ja/quit.png", 0.5, 0.5),
             mobile_right_handed: true,
             fight: Sprite::new(assets, "messages/ja/fight.png", 0.5, 0.5),
@@ -105,6 +150,9 @@ impl MenuView {
             s.visible = false;
         }
         for s in &mut self.mobile_mode {
+            s.visible = false;
+        }
+        for s in &mut self.matchup {
             s.visible = false;
         }
         self.mobile_quit.visible = false;
@@ -158,8 +206,9 @@ impl MenuView {
                 (self.selected_with_who_message_size_increment + 1).min(10);
         }
         let center_x = MENU_RIGHT_X;
+        let is_android = cfg!(target_os = "android");
         for (i, s) in self.with_who.iter_mut().enumerate() {
-            s.visible = frame_counter > 70 && (!cfg!(target_os = "android") || i == 0);
+            s.visible = frame_counter > 70 && (!is_android || i == 0);
             let scale = if self.selected_with_who == i as i32 {
                 1.0 + self.selected_with_who_message_size_increment as f64 * 0.02
             } else {
@@ -167,22 +216,44 @@ impl MenuView {
             };
             s.set_scale(scale);
             s.x = center_x;
-            s.y = if cfg!(target_os = "android") {
-                184.0
+            s.y = if is_android {
+                168.0
             } else {
-                184.0 + 36.0 * i as f64
+                175.0 + 32.0 * i as f64
             };
         }
         for (i, s) in self.mobile_mode.iter_mut().enumerate() {
-            s.visible = cfg!(target_os = "android")
+            s.visible = is_android
                 && frame_counter > 70
                 && (i == 0) == self.mobile_right_handed;
             s.x = center_x;
-            s.y = 216.0;
+            s.y = 198.0;
         }
-        self.mobile_quit.visible = cfg!(target_os = "android") && frame_counter > 70;
+
+        let active_matchup = self.skins_mode.menu_index();
+        let matchup_scale = if !is_android && self.selected_with_who == 2 {
+            1.0 + self.selected_with_who_message_size_increment as f64 * 0.02
+        } else {
+            1.0
+        };
+        for (i, s) in self.matchup.iter_mut().enumerate() {
+            s.visible = frame_counter > 70 && i == active_matchup;
+            s.set_scale(matchup_scale);
+            s.x = center_x;
+            s.y = if is_android { 228.0 } else { 239.0 };
+        }
+
+        self.mobile_quit.visible = is_android && frame_counter > 70;
         self.mobile_quit.x = center_x;
-        self.mobile_quit.y = 246.0;
+        self.mobile_quit.y = 258.0;
+    }
+
+    pub fn skins_mode(&self) -> PlayerSkinsMode {
+        self.skins_mode
+    }
+
+    pub fn set_skins_mode(&mut self, mode: PlayerSkinsMode) {
+        self.skins_mode = mode;
     }
 
     pub fn set_mobile_mode(&mut self, right_handed: bool) {
@@ -201,13 +272,16 @@ impl MenuView {
         for s in &mut self.with_who {
             s.begin_tick();
         }
+        for s in &mut self.matchup {
+            s.begin_tick();
+        }
         for s in &mut self.mobile_mode {
             s.begin_tick();
         }
         self.mobile_quit.begin_tick();
     }
 
-    /// Zaznacza opcję (0: z komputerem, 1: z kolegą) – zaznaczony napis rośnie.
+    /// Zaznacza opcję (0: z komputerem, 1: z kolegą, 2: zestawienie graczy) – zaznaczony napis rośnie.
     pub fn select_with_who(&mut self, i: i32) {
         self.selected_with_who = i;
         self.selected_with_who_message_size_increment = 2;
@@ -224,6 +298,10 @@ impl MenuView {
             &self.pikachu_volleyball,
             &self.with_who[0],
             &self.with_who[1],
+            &self.matchup[0],
+            &self.matchup[1],
+            &self.matchup[2],
+            &self.matchup[3],
             &self.mobile_mode[0],
             &self.mobile_mode[1],
             &self.mobile_quit,
@@ -328,6 +406,8 @@ pub struct GameView {
 
     player_shadows: [Sprite; 2],
     shadow_for_ball: Sprite,
+    player_textures: [Texture2D; 2],
+    player_skins_mode: PlayerSkinsMode,
     players: [Sprite; 2],
     ball_trail: BallTrail,
     ball: Sprite,
@@ -369,7 +449,10 @@ impl GameView {
                 }
             }
         }
-        let players = std::array::from_fn(|_| Sprite::animated(assets, &player_names, 0.5, 0.5));
+        let player_textures = [assets.player_texture(false), assets.player_texture(true)];
+        let mut players = std::array::from_fn(|_| Sprite::animated(assets, &player_names, 0.5, 0.5));
+        players[0].set_texture(player_textures[1].clone());
+        players[1].set_texture(player_textures[0].clone());
 
         // --- piłka ---
         let ball = Sprite::new(assets, "ball/ball_0.png", 0.5, 0.5);
@@ -423,6 +506,8 @@ impl GameView {
             light: assets.light(),
             player_shadows,
             shadow_for_ball,
+            player_textures,
+            player_skins_mode: PlayerSkinsMode::DEFAULT,
             players,
             ball_trail,
             ball,
@@ -453,6 +538,17 @@ impl GameView {
         self.game_start.visible = false;
         self.ready.visible = false;
         self.game_end.visible = false;
+    }
+
+    pub fn skins_mode(&self) -> PlayerSkinsMode {
+        self.player_skins_mode
+    }
+
+    pub fn set_player_skins_mode(&mut self, mode: PlayerSkinsMode) {
+        self.player_skins_mode = mode;
+        let (left_alt, right_alt) = mode.alt_flags();
+        self.players[0].set_texture(self.player_textures[usize::from(left_alt)].clone());
+        self.players[1].set_texture(self.player_textures[usize::from(right_alt)].clone());
     }
 
     /// Updates player/ball visuals and feedback from the simulation step.
@@ -768,5 +864,37 @@ mod score_layout_tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn player_skins_mode_cycle_matches_specification() {
+        assert_eq!(PlayerSkinsMode::DEFAULT, PlayerSkinsMode::LeftAltRightClassic);
+        assert_eq!(PlayerSkinsMode::DEFAULT.alt_flags(), (true, false));
+        assert_eq!(PlayerSkinsMode::DEFAULT.menu_index(), 0);
+
+        let mut mode = PlayerSkinsMode::DEFAULT;
+        // 1st cycle: Charmander vs. Charmander
+        mode = mode.next();
+        assert_eq!(mode, PlayerSkinsMode::BothAlt);
+        assert_eq!(mode.alt_flags(), (true, true));
+        assert_eq!(mode.menu_index(), 1);
+
+        // 2nd cycle: Pikachu vs. Charmander
+        mode = mode.next();
+        assert_eq!(mode, PlayerSkinsMode::LeftClassicRightAlt);
+        assert_eq!(mode.alt_flags(), (false, true));
+        assert_eq!(mode.menu_index(), 2);
+
+        // 3rd cycle: Pikachu vs. Pikachu
+        mode = mode.next();
+        assert_eq!(mode, PlayerSkinsMode::BothClassic);
+        assert_eq!(mode.alt_flags(), (false, false));
+        assert_eq!(mode.menu_index(), 3);
+
+        // 4th cycle: Charmander vs. Pikachu (powrót do początku)
+        mode = mode.next();
+        assert_eq!(mode, PlayerSkinsMode::LeftAltRightClassic);
+        assert_eq!(mode.alt_flags(), (true, false));
+        assert_eq!(mode.menu_index(), 0);
     }
 }

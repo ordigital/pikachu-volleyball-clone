@@ -29,6 +29,10 @@ impl Assets {
                 include_bytes!("../assets/images/players.png").as_slice(),
             ),
             (
+                "players2",
+                include_bytes!("../assets/images/players2.png").as_slice(),
+            ),
+            (
                 "title_pikachu",
                 include_bytes!("../assets/images/title_pikachu.png").as_slice(),
             ),
@@ -68,6 +72,10 @@ impl Assets {
             "messages/common/ready.png",
             "messages/ja/game_start.png",
             "messages/ja/pokemon.png",
+            "messages/matchup/0.png",
+            "messages/matchup/1.png",
+            "messages/matchup/2.png",
+            "messages/matchup/3.png",
         ] {
             let (text, _, _, is_title) = text_definition(name).unwrap();
             labels.insert(
@@ -101,6 +109,14 @@ impl Assets {
         self.images["menu_grass"].clone()
     }
 
+    pub(crate) fn player_texture(&self, alt: bool) -> Texture2D {
+        if alt {
+            self.images["players2"].clone()
+        } else {
+            self.images["players"].clone()
+        }
+    }
+
     fn asset(&self, name: &str) -> (Art, Rect, (f32, f32)) {
         if let Some((_, size, color, title)) = text_definition(name) {
             return (
@@ -123,7 +139,7 @@ impl Assets {
             _ => {
                 let (key, size, mut rect) = image_definition(name);
                 let texture = self.images[key].clone();
-                if key == "players" {
+                if key == "players" || key == "players2" {
                     // Mapowanie klatek pozostaje w jednostkach oryginalnego atlasu.
                     let sx = texture.width() / 1484.0;
                     let sy = texture.height() / 832.0;
@@ -197,6 +213,10 @@ fn text_definition(name: &str) -> Option<(&'static str, (f32, f32), Color, bool)
             false,
         ),
         "messages/ja/pokemon.png" => ("BEACH VOLLEYBALL", (200.0, 32.0), blue, true),
+        "messages/matchup/0.png" => ("CHARMANDER VS. PIKACHU", (220.0, 16.0), orange, false),
+        "messages/matchup/1.png" => ("CHARMANDER VS. CHARMANDER", (220.0, 16.0), orange, false),
+        "messages/matchup/2.png" => ("PIKACHU VS. CHARMANDER", (220.0, 16.0), orange, false),
+        "messages/matchup/3.png" => ("PIKACHU VS. PIKACHU", (220.0, 16.0), orange, false),
         _ => {
             let digit = name.strip_prefix("number/number_")?.strip_suffix(".png")?;
             let label = match digit {
@@ -314,6 +334,12 @@ impl Sprite {
     /// `AnimatedSprite.gotoAndStop`
     pub fn goto_and_stop(&mut self, frame: usize) {
         self.frame = frame;
+    }
+
+    pub fn set_texture(&mut self, texture: Texture2D) {
+        if let Art::Image(t) = &mut self.art {
+            *t = texture;
+        }
     }
 
     /// Zapamiętuje bieżącą pozycję jako „poprzednią” (początek nowego kroku symulacji).

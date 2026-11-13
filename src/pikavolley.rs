@@ -84,6 +84,7 @@ pub struct PikachuVolleyball {
 
     /// 0: z komputerem, 1: z kolegą
     selected_with_who: i32,
+    menu_y_direction_previous: i32,
     android_right_handed: bool,
     touch_start_requested: bool,
     scores: [i32; 2],
@@ -128,6 +129,7 @@ impl PikachuVolleyball {
             ticks_since_advance: 0,
             advance_interval: 1,
             selected_with_who: 0,
+            menu_y_direction_previous: 0,
             android_right_handed: true,
             touch_start_requested: false,
             scores: [0, 0],
@@ -291,23 +293,38 @@ impl PikachuVolleyball {
             return;
         }
 
-        if !cfg!(target_os = "android")
-            && (k0.y_direction == -1 || k1.y_direction == -1)
-            && self.selected_with_who == 1
-        {
-            self.selected_with_who = 0;
+        let y_dir = if k0.y_direction != 0 {
+            k0.y_direction
+        } else {
+            k1.y_direction
+        };
+        let y_edge = if self.menu_y_direction_previous == 0 {
+            y_dir
+        } else {
+            0
+        };
+        self.menu_y_direction_previous = y_dir;
+
+        if !cfg!(target_os = "android") && y_edge == -1 && self.selected_with_who > 0 {
+            self.selected_with_who -= 1;
             self.menu.select_with_who(self.selected_with_who);
             self.audio.play(Snd::Pi, 0);
-        } else if !cfg!(target_os = "android")
-            && (k0.y_direction == 1 || k1.y_direction == 1)
-            && self.selected_with_who == 0
-        {
-            self.selected_with_who = 1;
+        } else if !cfg!(target_os = "android") && y_edge == 1 && self.selected_with_who < 2 {
+            self.selected_with_who += 1;
             self.menu.select_with_who(self.selected_with_who);
             self.audio.play(Snd::Pi, 0);
         }
 
+        if !cfg!(target_os = "android")
+            && self.selected_with_who == 2
+            && (k0.power_hit == 1 || k1.power_hit == 1)
+        {
+            self.cycle_skins_mode();
+            return;
+        }
+
         if k0.power_hit == 1 || k1.power_hit == 1 || self.touch_start_requested {
+            self.game.set_player_skins_mode(self.menu.skins_mode());
             let touch_start = std::mem::take(&mut self.touch_start_requested);
             if cfg!(target_os = "android") {
                 self.physics.player1.is_computer = self.android_right_handed;
@@ -335,6 +352,7 @@ impl PikachuVolleyball {
 
         if !cfg!(target_os = "android") && self.no_input_frame_counter >= NO_INPUT_FRAME_TOTAL_MENU
         {
+            self.game.set_player_skins_mode(self.menu.skins_mode());
             self.audio.stop_bgm();
             self.fade_menu_music = false;
             self.physics.player1.is_computer = true;
@@ -533,23 +551,25 @@ impl PikachuVolleyball {
 
     /// Efekty dźwiękowe w trakcie rundy
     fn play_sound_effect(&mut self) {
+        let (left_alt, right_alt) = self.game.skins_mode().alt_flags();
         for i in 0..2 {
             let player = if i == 0 {
                 &mut self.physics.player1
             } else {
                 &mut self.physics.player2
             };
+            let alt = if i == 0 { left_alt } else { right_alt };
             let pan = if i == 0 { -1 } else { 1 };
             if player.sound.pipikachu {
-                self.audio.play(Snd::Pipikachu, pan);
+                self.audio.play_alt(Snd::Pipikachu, pan, alt);
                 player.sound.pipikachu = false;
             }
             if player.sound.pika {
-                self.audio.play(Snd::Pika, pan);
+                self.audio.play_alt(Snd::Pika, pan, alt);
                 player.sound.pika = false;
             }
             if player.sound.chu {
-                self.audio.play(Snd::Chu, pan);
+                self.audio.play_alt(Snd::Chu, pan, alt);
                 player.sound.chu = false;
             }
         }
@@ -583,7 +603,17 @@ impl PikachuVolleyball {
         self.fade.set_black_alpha_to(0.0);
         self.menu.set_visible(false);
         self.game.set_visible(false);
+        self.game.set_player_skins_mode(self.menu.skins_mode());
+        self.menu_y_direction_previous = 0;
         self.state = State::Menu;
+    }
+
+    pub fn cycle_skins_mode(&mut self) -> crate::view::PlayerSkinsMode {
+        let next = self.menu.skins_mode().next();
+        self.menu.set_skins_mode(next);
+        self.game.set_player_skins_mode(next);
+        self.audio.play(Snd::Pi, 0);
+        next
     }
 
     pub fn update_enter_release(&mut self, enter_down: bool) {
