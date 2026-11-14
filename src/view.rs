@@ -226,12 +226,18 @@ impl MenuView {
             s.visible = is_android
                 && frame_counter > 70
                 && (i == 0) == self.mobile_right_handed;
+            let scale = if is_android && self.selected_with_who == 1 {
+                1.0 + self.selected_with_who_message_size_increment as f64 * 0.02
+            } else {
+                1.0
+            };
+            s.set_scale(scale);
             s.x = center_x;
             s.y = 198.0;
         }
 
         let active_matchup = self.skins_mode.menu_index();
-        let matchup_scale = if !is_android && self.selected_with_who == 2 {
+        let matchup_scale = if self.selected_with_who == 2 {
             1.0 + self.selected_with_who_message_size_increment as f64 * 0.02
         } else {
             1.0
@@ -244,6 +250,12 @@ impl MenuView {
         }
 
         self.mobile_quit.visible = is_android && frame_counter > 70;
+        let quit_scale = if is_android && self.selected_with_who == 3 {
+            1.0 + self.selected_with_who_message_size_increment as f64 * 0.02
+        } else {
+            1.0
+        };
+        self.mobile_quit.set_scale(quit_scale);
         self.mobile_quit.x = center_x;
         self.mobile_quit.y = 258.0;
     }
@@ -426,8 +438,8 @@ pub struct GameView {
 
 impl GameView {
     pub fn new(assets: &Assets) -> Self {
-        // --- tło ---
-        let bg_bytes = include_bytes!("../assets/images/background-wide.webp");
+        // --- tło (1672×941 mieści się bez problemu w GL_MAX_TEXTURE_SIZE 4096 i zapewnia pełną ostrość) ---
+        let bg_bytes = include_bytes!("../assets/images/background-wide.webp").as_slice();
         let bg_tex = crate::texture::load(bg_bytes);
         bg_tex.set_filter(FilterMode::Linear);
 

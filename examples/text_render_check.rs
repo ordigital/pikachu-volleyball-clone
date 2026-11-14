@@ -17,6 +17,9 @@ mod rendering;
 #[allow(dead_code)]
 #[path = "../src/scene.rs"]
 mod scene;
+#[allow(dead_code)]
+#[path = "../src/texture.rs"]
+mod texture;
 #[path = "../src/text_label.rs"]
 mod text_label;
 

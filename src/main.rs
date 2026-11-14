@@ -50,6 +50,7 @@ fn window_conf() -> Conf {
         window_resizable: true,
         high_dpi: true,
         fullscreen: cfg!(target_os = "android"),
+        sample_count: 0,
         platform: macroquad::miniquad::conf::Platform {
             // GLX can terminate XWayland with GLXBadFBConfig before fallback.
             linux_x11_gl: macroquad::miniquad::conf::LinuxX11Gl::EGLOnly,
@@ -98,6 +99,45 @@ fn android_call(method: &str) {
     }
 }
 
+/// Compute where the game scene rectangle goes in the window/screen and the fitting scale.
+/// Returns (scene_x, scene_y, scene_w, scene_h, scale).
+fn scene_placement(screen_w: f32, screen_h: f32, menu_h: f32, portrait: bool) -> (f32, f32, f32, f32, f32) {
+    if portrait {
+        // Portrait: game fills the width, sits at the top.
+        let scale = screen_w / SCREEN_W;
+        let w = screen_w;
+        let h = SCREEN_H * scale;
+        // Cap game scene to at most 55% of screen height so controls have room.
+        let max_h = screen_h * 0.55;
+        if h > max_h {
+            let capped_scale = max_h / SCREEN_H;
+            let cw = SCREEN_W * capped_scale;
+            (
+                (screen_w - cw) * 0.5,
+                0.0,
+                cw,
+                max_h,
+                capped_scale,
+            )
+        } else {
+            (0.0, 0.0, w, h, scale)
+        }
+    } else {
+        // Landscape / desktop: centered with aspect ratio preserved.
+        let avail_h = (screen_h - menu_h).max(1.0);
+        let scale = f32::min(screen_w / SCREEN_W, avail_h / SCREEN_H);
+        let w = SCREEN_W * scale;
+        let h = SCREEN_H * scale;
+        (
+            (screen_w - w) * 0.5,
+            menu_h + (avail_h - h) * 0.5,
+            w,
+            h,
+            scale,
+        )
+    }
+}
+
 #[macroquad::main(window_conf)]
 async fn main() {
     #[cfg(target_os = "android")]
@@ -111,6 +151,7 @@ async fn main() {
     let on_android = cfg!(target_os = "android");
     let web = cfg!(target_arch = "wasm32");
     let presentation = rendering::opaque_presentation();
+    crate::texture::init_device_profile();
 
     let assets = gfx::Assets::load();
     let mut game = pikavolley::PikachuVolleyball::new(&assets);
@@ -129,11 +170,19 @@ async fn main() {
     );
 
     // Minimalne supersampling 3×; większy bufor dobieramy do okna i DPI.
-    let mut target_scale = rendering::scene_scale(0.0, 1.0);
-    let mut target = render_target(
-        SCREEN_W as u32 * target_scale,
-        SCREEN_H as u32 * target_scale,
-    );
+    // Na starszych urządzeniach mobilnych używamy stałego 2× (1088×612), co daje
+    // idealną ostrość na ekranach qHD (960×540) i 720p bez nadmiarowego 3× (1632×918).
+    let low_end_mobile = on_android && crate::texture::is_low_end_device();
+    let compute_target_size = |scale: f32, dpi: f32| -> (u32, u32) {
+        let s = if low_end_mobile {
+            2
+        } else {
+            rendering::scene_scale(scale, dpi)
+        };
+        (SCREEN_W as u32 * s, SCREEN_H as u32 * s)
+    };
+    let mut target_size = compute_target_size(0.0, 1.0);
+    let mut target = render_target(target_size.0, target_size.1);
     target.texture.set_filter(FilterMode::Linear);
     let mut cam = Camera2D::from_display_rect(Rect::new(0.0, 0.0, SCREEN_W, SCREEN_H));
     cam.render_target = Some(target.clone());
@@ -152,6 +201,16 @@ async fn main() {
         game.update_enter_release(is_key_down(KeyCode::Enter) || is_key_down(KeyCode::KpEnter));
         let mut modal = ui.modal();
 
+        // Detect portrait orientation (Android only; desktop always landscape layout).
+        let portrait = on_android && screen_height() > screen_width();
+
+        // Compute portrait layout once per frame (only if portrait).
+        let portrait_layout = if portrait {
+            Some(touch::PortraitLayout::compute(screen_width(), screen_height(), touch.right_handed))
+        } else {
+            None
+        };
+
         #[cfg(target_os = "android")]
         if pad::take_back() {
             if game.is_menu() {
@@ -162,27 +221,26 @@ async fn main() {
         }
 
         if on_android && game.is_menu() {
+            let menu_h = 0.0f32;
+            let (sx, sy, _sw, sh, scale) = scene_placement(screen_width(), screen_height(), menu_h, portrait);
+            // Wyłącznie kliknięcia w obrębie samej sceny gry (nie w panelu kontrolek poniżej).
             let android_menu_click = touches()
                 .iter()
-                .find(|t| t.phase == TouchPhase::Ended)
+                .find(|t| t.phase == TouchPhase::Ended && t.position.y <= sy + sh)
                 .map(|t| t.position);
             if let Some(point) = android_menu_click {
-                let scale = (screen_width() / SCREEN_W).min(screen_height() / SCREEN_H);
-                let logical = (point
-                    - vec2(
-                        (screen_width() - SCREEN_W * scale) * 0.5,
-                        (screen_height() - SCREEN_H * scale) * 0.5,
-                    ))
-                    / scale;
-                if logical.x >= 410.0 && logical.y >= 270.0 {
+                let logical = (point - vec2(sx, sy)) / scale;
+                // Przycisk wsparcia jest wyłącznie w prawym dolnym rogu sceny gry.
+                if (410.0..=544.0).contains(&logical.x) && (270.0..=306.0).contains(&logical.y) {
                     #[cfg(target_os = "android")]
                     android_call("openSupport");
                 } else if (200.0..=440.0).contains(&logical.x) {
                     if (153.0..183.0).contains(&logical.y) {
                         game.request_touch_start(false);
                     } else if (183.0..213.0).contains(&logical.y) {
-                        touch.right_handed = !touch.right_handed;
-                        game.set_android_mode(touch.right_handed);
+                        let new_mode = !game.is_android_right_handed();
+                        game.set_android_mode(new_mode);
+                        touch.right_handed = new_mode;
                     } else if (213.0..243.0).contains(&logical.y) {
                         game.cycle_skins_mode();
                     } else if (243.0..275.0).contains(&logical.y) {
@@ -223,6 +281,12 @@ async fn main() {
             }
         }
         if on_android {
+            if game.quit_requested {
+                #[cfg(target_os = "android")]
+                android_call("quitGame");
+                break 'main;
+            }
+            touch.right_handed = game.is_android_right_handed();
             controls.players[0].pad_index = if touch.right_handed { None } else { Some(0) };
             controls.players[1].pad_index = if touch.right_handed { Some(0) } else { None };
         }
@@ -256,9 +320,13 @@ async fn main() {
         }
 
         // --- stały krok symulacji 25 Hz ---
-        let touch_state = touch.update(touch_dpi,
-            game.is_menu() || modal || game.is_paused() || (on_android && pads.count() > 0),
-        );
+        // W trybie portretowym kontrolki ekranowe są aktywne także w menu (D-pad nawiguje, A/B zatwierdza).
+        let touch_blocked = (!portrait && game.is_menu()) || modal || game.is_paused() || (on_android && pads.count() > 0);
+        let touch_state = if let Some(ref layout) = portrait_layout {
+            touch.update_portrait(touch_blocked, layout, game.is_menu())
+        } else {
+            touch.update(touch_dpi, touch_blocked)
+        };
         if game.is_menu() || modal || game.is_paused() {
             pending_hit = false;
         } else {
@@ -290,15 +358,18 @@ async fn main() {
         } else {
             ui.menu_height(fullscreen)
         };
-        let avail_h = (screen_height() - menu_h).max(1.0);
-        let scale = f32::min(screen_width() / SCREEN_W, avail_h / SCREEN_H);
-        let next_scale = rendering::scene_scale(scale, screen_dpi_scale());
-        if next_scale != target_scale {
-            target_scale = next_scale;
-            target = render_target(
-                SCREEN_W as u32 * target_scale,
-                SCREEN_H as u32 * target_scale,
-            );
+        let (scene_x, scene_y, w, h, scale) = scene_placement(screen_width(), screen_height(), menu_h, portrait);
+
+        // Na starszych urządzeniach mobilnych dopasowujemy bufor dokładnie do fizycznych
+        // pikseli ekranu (np. 960×540 qHD), co daje 1:1 ostrość bez nadmiarowego 3× supersamplingu.
+        let next_size = if low_end_mobile {
+            (w.round() as u32, h.round() as u32)
+        } else {
+            compute_target_size(scale, screen_dpi_scale())
+        };
+        if next_size != target_size {
+            target_size = next_size;
+            target = render_target(target_size.0, target_size.1);
             target.texture.set_filter(FilterMode::Linear);
             cam.render_target = Some(target.clone());
         }
@@ -311,13 +382,11 @@ async fn main() {
         // --- bufor -> okno (pod paskiem menu, z zachowaniem proporcji) ---
         set_default_camera();
         clear_background(BLACK);
-        let w = SCREEN_W * scale;
-        let h = SCREEN_H * scale;
         gl_use_material(&presentation);
         draw_texture_ex(
             &target.texture,
-            (screen_width() - w) / 2.0,
-            menu_h + (avail_h - h) / 2.0,
+            scene_x,
+            scene_y,
             WHITE,
             DrawTextureParams {
                 dest_size: Some(vec2(w, h)),
@@ -328,11 +397,14 @@ async fn main() {
 
         gl_use_default_material();
 
+        // --- portrait on-screen controls (drawn below the game scene) ---
+        if let Some(ref layout) = portrait_layout {
+            layout.draw();
+        }
+
         // --- menu i okna (na wierzchu); sterowanie dotykowe jest niewidoczne ---
         if on_android && game.is_menu() {
-            let left = (screen_width() - w) / 2.0;
-            let top = (screen_height() - h) / 2.0;
-            ui.android_support(None, scale, left, top);
+            ui.android_support(None, scale, scene_x, scene_y);
         }
         let music_on = game.audio_mut().is_bgm_on();
         match if on_android {
@@ -347,6 +419,14 @@ async fn main() {
             Some(ui::UiCmd::MusicOff) => game.audio_mut().turn_bgm_volume(false),
             Some(ui::UiCmd::ToggleFullscreen) => toggle_fullscreen(&mut fullscreen),
             None => {}
+        }
+
+        if on_android {
+            let fps = get_fps();
+            let fps_str = format!("{fps} FPS");
+            let fps_y = screen_height() - 8.0;
+            draw_rectangle(6.0, fps_y - 14.0, 64.0, 18.0, Color::new(0.0, 0.0, 0.0, 0.65));
+            draw_text(&fps_str, 10.0, fps_y, 16.0, WHITE);
         }
 
         next_frame().await;

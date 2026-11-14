@@ -16,22 +16,26 @@ const ROWS: [(f32, f32); 8] = [
 ];
 
 pub fn draw(texture: &Texture2D) {
-    let mut mesh = Mesh {
-        vertices: Vec::with_capacity(16),
-        indices: Vec::with_capacity(42),
+    static GEOMETRY: std::sync::OnceLock<(Vec<Vertex>, Vec<u16>)> = std::sync::OnceLock::new();
+    let (vertices, indices) = GEOMETRY.get_or_init(|| {
+        let mut vertices = Vec::with_capacity(16);
+        let mut indices = Vec::with_capacity(42);
+        for (i, &(source_y, y)) in ROWS.iter().enumerate() {
+            for (x, u) in [(0.0, 0.0), (WIDTH, 1.0)] {
+                vertices.push(Vertex::new(x, y, 0.0, u, source_y / 941.0, WHITE));
+            }
+            if i > 0 {
+                let n = (i * 2) as u16;
+                indices.extend_from_slice(&[n - 2, n - 1, n, n - 1, n + 1, n]);
+            }
+        }
+        (vertices, indices)
+    });
+    let mesh = Mesh {
+        vertices: vertices.clone(),
+        indices: indices.clone(),
         texture: Some(texture.clone()),
     };
-    for (i, &(source_y, y)) in ROWS.iter().enumerate() {
-        for (x, u) in [(0.0, 0.0), (WIDTH, 1.0)] {
-            mesh.vertices
-                .push(Vertex::new(x, y, 0.0, u, source_y / 941.0, WHITE));
-        }
-        if i > 0 {
-            let n = (i * 2) as u16;
-            mesh.indices
-                .extend_from_slice(&[n - 2, n - 1, n, n - 1, n + 1, n]);
-        }
-    }
     draw_mesh(&mesh);
 }
 

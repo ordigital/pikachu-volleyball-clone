@@ -43,6 +43,7 @@ private void refreshPads() {
         android.view.InputDevice device = android.view.InputDevice.getDevice(id);
         if (device != null && !device.isVirtual() &&
             ((device.getSources() & android.view.InputDevice.SOURCE_GAMEPAD) == android.view.InputDevice.SOURCE_GAMEPAD ||
+             (device.getSources() & android.view.InputDevice.SOURCE_DPAD) == android.view.InputDevice.SOURCE_DPAD ||
              ((device.getSources() & android.view.InputDevice.SOURCE_JOYSTICK) == android.view.InputDevice.SOURCE_JOYSTICK &&
               device.getMotionRange(android.view.MotionEvent.AXIS_X) != null &&
               device.getMotionRange(android.view.MotionEvent.AXIS_Y) != null))) {
@@ -71,10 +72,21 @@ private void refreshPads() {
         }
         return true;
     }
-    if (event.getDeviceId() == padId && padId >= 0) {
+    boolean isGamepadEvent = (padId >= 0 && event.getDeviceId() == padId) ||
+        (event.getSource() & android.view.InputDevice.SOURCE_GAMEPAD) == android.view.InputDevice.SOURCE_GAMEPAD ||
+        (event.getSource() & android.view.InputDevice.SOURCE_JOYSTICK) == android.view.InputDevice.SOURCE_JOYSTICK ||
+        (event.getSource() & android.view.InputDevice.SOURCE_DPAD) == android.view.InputDevice.SOURCE_DPAD;
+    if (isGamepadEvent) {
         int bit = 0;
         switch (event.getKeyCode()) {
-            case android.view.KeyEvent.KEYCODE_BUTTON_A: bit = 1; break;
+            case android.view.KeyEvent.KEYCODE_BUTTON_A:
+            case android.view.KeyEvent.KEYCODE_BUTTON_B:
+            case android.view.KeyEvent.KEYCODE_BUTTON_X:
+            case android.view.KeyEvent.KEYCODE_BUTTON_Y:
+            case android.view.KeyEvent.KEYCODE_BUTTON_START:
+            case android.view.KeyEvent.KEYCODE_DPAD_CENTER:
+            case android.view.KeyEvent.KEYCODE_ENTER:
+                bit = 1; break;
             case android.view.KeyEvent.KEYCODE_DPAD_LEFT: bit = 2; break;
             case android.view.KeyEvent.KEYCODE_DPAD_RIGHT: bit = 4; break;
             case android.view.KeyEvent.KEYCODE_DPAD_UP: bit = 8; break;

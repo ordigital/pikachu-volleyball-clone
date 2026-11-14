@@ -22,32 +22,47 @@ pub struct Assets {
 
 impl Assets {
     pub fn load() -> Self {
+        let max_tex = crate::texture::max_texture_size();
+        let low_end = crate::texture::is_low_end_device();
+        let (players_bytes, players2_bytes): (&[u8], &[u8]) = if low_end || max_tex < 4452 {
+            (
+                include_bytes!("../assets/images/players_compact.webp").as_slice(),
+                include_bytes!("../assets/images/players2_compact.webp").as_slice(),
+            )
+        } else {
+            (
+                include_bytes!("../assets/images/players.png").as_slice(),
+                include_bytes!("../assets/images/players2.png").as_slice(),
+            )
+        };
+        let title_bytes: &[u8] = if low_end || max_tex < 3632 {
+            include_bytes!("../assets/images/title_pikachu_compact.webp").as_slice()
+        } else {
+            include_bytes!("../assets/images/title_pikachu.png").as_slice()
+        };
+        let sitting_bytes: &[u8] = if low_end || max_tex < 2048 {
+            include_bytes!("../assets/images/sitting_pikachu_compact.webp").as_slice()
+        } else {
+            include_bytes!("../assets/images/sitting_pikachu.png").as_slice()
+        };
+        let cloud_bytes: &[u8] = if low_end {
+            include_bytes!("../assets/images/cloud_compact.webp").as_slice()
+        } else {
+            include_bytes!("../assets/images/cloud.png").as_slice()
+        };
+        let grass_bytes: &[u8] = if low_end {
+            include_bytes!("../assets/images/menu_grass_compact.webp").as_slice()
+        } else {
+            include_bytes!("../assets/images/menu_grass.webp").as_slice()
+        };
         let mut images = HashMap::new();
         for (name, bytes) in [
-            (
-                "players",
-                include_bytes!("../assets/images/players.png").as_slice(),
-            ),
-            (
-                "players2",
-                include_bytes!("../assets/images/players2.png").as_slice(),
-            ),
-            (
-                "title_pikachu",
-                include_bytes!("../assets/images/title_pikachu.png").as_slice(),
-            ),
-            (
-                "cloud",
-                include_bytes!("../assets/images/cloud.png").as_slice(),
-            ),
-            (
-                "sitting_pikachu",
-                include_bytes!("../assets/images/sitting_pikachu.png").as_slice(),
-            ),
-            (
-                "menu_grass",
-                include_bytes!("../assets/images/menu_grass.webp").as_slice(),
-            ),
+            ("players", players_bytes),
+            ("players2", players2_bytes),
+            ("title_pikachu", title_bytes),
+            ("cloud", cloud_bytes),
+            ("sitting_pikachu", sitting_bytes),
+            ("menu_grass", grass_bytes),
         ] {
             let texture = crate::texture::load(bytes);
             texture.set_filter(FilterMode::Linear);

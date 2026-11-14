@@ -11,10 +11,15 @@ pub struct CloudRenderer {
 
 impl CloudRenderer {
     pub fn new(texture: Texture2D) -> Self {
+        let fragment = if crate::texture::is_low_end_device() {
+            include_str!("../assets/shaders/cloud_fast.frag")
+        } else {
+            include_str!("../assets/shaders/cloud.frag")
+        };
         let material = load_material(
             ShaderSource::Glsl {
                 vertex: crate::rendering::VERTEX,
-                fragment: include_str!("../assets/shaders/cloud.frag"),
+                fragment,
             },
             MaterialParams {
                 pipeline_params: crate::rendering::source_over(),
@@ -30,14 +35,35 @@ impl CloudRenderer {
     }
 
     pub fn draw(&self, clouds: &[Sprite], t: f64) {
+        if crate::texture::is_low_end_device() {
+            for cloud in clouds.iter().take(5) {
+                let (x, y, w, h) = cloud.interpolated_transform(t);
+                if w <= 0.0 || h <= 0.0 {
+                    continue;
+                }
+                draw_texture_ex(
+                    &self.texture,
+                    x as f32,
+                    y as f32,
+                    WHITE,
+                    DrawTextureParams {
+                        dest_size: Some(vec2(w as f32, h as f32)),
+                        ..Default::default()
+                    },
+                );
+            }
+            return;
+        }
+
+        let count = NUM_OF_CLOUDS;
         let mut rects = [Vec4::ZERO; NUM_OF_CLOUDS];
-        for (rect, cloud) in rects.iter_mut().zip(clouds) {
+        for (rect, cloud) in rects.iter_mut().take(count).zip(clouds.iter().take(count)) {
             let (x, y, w, h) = cloud.interpolated_transform(t);
             *rect = vec4(x as f32, y as f32, w as f32, h as f32);
         }
         self.material.set_uniform_array("CloudRects", &rects);
         gl_use_material(&self.material);
-        for (index, rect) in rects.iter().enumerate() {
+        for (index, rect) in rects.iter().take(count).enumerate() {
             if rect.z <= 0.0 || rect.w <= 0.0 {
                 continue;
             }

@@ -13,6 +13,8 @@ const SFX_VOLUME: f32 = 0.35;
 
 const BGM_BYTES: &[u8] = include_bytes!("../assets/sounds/bgm.ogg");
 const MENU_BGM_BYTES: &[u8] = include_bytes!("../assets/sounds/menu.ogg");
+const BGM_LOW_BYTES: &[u8] = include_bytes!("../assets/sounds/bgm_low.ogg");
+const MENU_BGM_LOW_BYTES: &[u8] = include_bytes!("../assets/sounds/menu_low.ogg");
 
 #[derive(Clone, Copy)]
 enum MusicTrack {
@@ -22,9 +24,16 @@ enum MusicTrack {
 
 impl MusicTrack {
     fn bytes(self) -> &'static [u8] {
-        match self {
-            Self::Menu => MENU_BGM_BYTES,
-            Self::Game => BGM_BYTES,
+        if crate::texture::is_low_end_device() {
+            match self {
+                Self::Menu => MENU_BGM_LOW_BYTES,
+                Self::Game => BGM_LOW_BYTES,
+            }
+        } else {
+            match self {
+                Self::Menu => MENU_BGM_BYTES,
+                Self::Game => BGM_BYTES,
+            }
         }
     }
 

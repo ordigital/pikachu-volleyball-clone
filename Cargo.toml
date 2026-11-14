@@ -1,6 +1,6 @@
 [package]
 name = "pikachu-volleyball"
-version = "1.1.0"
+version = "1.1.1"
 edition = "2021"
 description = "HD remake of Pikachu Volleyball for desktop and Android, built with Rust"
 
@@ -30,7 +30,7 @@ min_sdk_version = 21
 build_targets = ["aarch64-linux-android", "armv7-linux-androideabi"]
 
 [package.metadata.android.activity_attributes]
-"android:screenOrientation" = "landscape"
+"android:screenOrientation" = "fullSensor"
 
 [package.metadata.android.application_attributes]
 "android:enableOnBackInvokedCallback" = "true"

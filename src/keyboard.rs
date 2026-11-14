@@ -68,7 +68,10 @@ impl PikaKeyboard {
             0
         };
 
-        let is_down = held(Action::PowerHit) || t.action;
+        let pad_confirm = c
+            .pad_index
+            .is_some_and(|i| pads.is_down(i, crate::input::PadBtn::Start) || pads.is_down(i, crate::input::PadBtn::East));
+        let is_down = held(Action::PowerHit) || t.action || pad_confirm;
         self.input.power_hit = if !self.power_hit_key_is_down_previous && is_down {
             1
         } else {

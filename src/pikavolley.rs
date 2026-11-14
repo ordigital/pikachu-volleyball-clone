@@ -87,6 +87,7 @@ pub struct PikachuVolleyball {
     menu_y_direction_previous: i32,
     android_right_handed: bool,
     touch_start_requested: bool,
+    pub quit_requested: bool,
     scores: [i32; 2],
     /// wygrywa ten, kto pierwszy dobije do tej liczby punktów
     pub winning_score: i32,
@@ -132,6 +133,7 @@ impl PikachuVolleyball {
             menu_y_direction_previous: 0,
             android_right_handed: true,
             touch_start_requested: false,
+            quit_requested: false,
             scores: [0, 0],
             winning_score: 15,
             game_ended: false,
@@ -305,25 +307,48 @@ impl PikachuVolleyball {
         };
         self.menu_y_direction_previous = y_dir;
 
-        if !cfg!(target_os = "android") && y_edge == -1 && self.selected_with_who > 0 {
+        let max_sel = if cfg!(target_os = "android") { 3 } else { 2 };
+        if y_edge == -1 && self.selected_with_who > 0 {
             self.selected_with_who -= 1;
             self.menu.select_with_who(self.selected_with_who);
             self.audio.play(Snd::Pi, 0);
-        } else if !cfg!(target_os = "android") && y_edge == 1 && self.selected_with_who < 2 {
+        } else if y_edge == 1 && self.selected_with_who < max_sel {
             self.selected_with_who += 1;
             self.menu.select_with_who(self.selected_with_who);
             self.audio.play(Snd::Pi, 0);
         }
 
+        let action_pressed = k0.power_hit == 1 || k1.power_hit == 1;
+        if cfg!(target_os = "android") && action_pressed {
+            match self.selected_with_who {
+                1 => {
+                    self.android_right_handed = !self.android_right_handed;
+                    self.menu.set_mobile_mode(self.android_right_handed);
+                    self.audio.play(Snd::Pi, 0);
+                    return;
+                }
+                2 => {
+                    self.cycle_skins_mode();
+                    return;
+                }
+                3 => {
+                    self.quit_requested = true;
+                    self.audio.play(Snd::Pi, 0);
+                    return;
+                }
+                _ => {} // 0: START GAME
+            }
+        }
+
         if !cfg!(target_os = "android")
             && self.selected_with_who == 2
-            && (k0.power_hit == 1 || k1.power_hit == 1)
+            && action_pressed
         {
             self.cycle_skins_mode();
             return;
         }
 
-        if k0.power_hit == 1 || k1.power_hit == 1 || self.touch_start_requested {
+        if action_pressed || self.touch_start_requested {
             self.game.set_player_skins_mode(self.menu.skins_mode());
             let touch_start = std::mem::take(&mut self.touch_start_requested);
             if cfg!(target_os = "android") {
@@ -635,6 +660,10 @@ impl PikachuVolleyball {
     pub fn set_android_mode(&mut self, right_handed: bool) {
         self.android_right_handed = right_handed;
         self.menu.set_mobile_mode(right_handed);
+    }
+
+    pub fn is_android_right_handed(&self) -> bool {
+        self.android_right_handed
     }
 
     pub fn request_touch_start(&mut self, two_players: bool) {

@@ -1,5 +1,5 @@
 #version 100
-precision highp float;
+precision mediump float;
 varying mediump vec2 uv;
 varying lowp vec4 color;
 uniform sampler2D Texture;

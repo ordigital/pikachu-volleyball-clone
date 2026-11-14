@@ -27,6 +27,7 @@ pub const EGL_GREEN_SIZE: u32 = 12323;
 pub const EGL_RED_SIZE: u32 = 12324;
 pub const EGL_DEPTH_SIZE: u32 = 12325;
 pub const EGL_STENCIL_SIZE: u32 = 12326;
+pub const EGL_SAMPLE_BUFFERS: u32 = 12338;
 pub const EGL_SAMPLES: u32 = 12337;
 pub const EGL_NATIVE_VISUAL_ID: u32 = 12334;
 pub const EGL_WIDTH: u32 = 12375;
@@ -184,6 +185,11 @@ pub unsafe fn create_egl_context(
     }
 
     let alpha_size = if alpha { 8 } else { 0 };
+    let (samples, sample_buffers) = if sample_count > 1 {
+        (sample_count as u32, 1)
+    } else {
+        (0, 0)
+    };
     #[rustfmt::skip]
     let cfg_attributes = [
         EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
@@ -193,7 +199,8 @@ pub unsafe fn create_egl_context(
         EGL_ALPHA_SIZE, alpha_size,
         EGL_DEPTH_SIZE, 16,
         EGL_STENCIL_SIZE, 0,
-        EGL_SAMPLES, sample_count as u32,
+        EGL_SAMPLE_BUFFERS, sample_buffers,
+        EGL_SAMPLES, samples,
         EGL_NONE,
     ];
     let mut available_cfgs: Vec<EGLConfig> = vec![null_mut(); 32];
@@ -218,16 +225,21 @@ pub unsafe fn create_egl_context(
         let mut b: i32 = 0;
         let mut a: i32 = 0;
         let mut d: i32 = 0;
+        let mut s: i32 = 0;
+        let mut sb: i32 = 0;
         if (egl.eglGetConfigAttrib)(display, *c, EGL_RED_SIZE as _, &mut r) == 1
             && (egl.eglGetConfigAttrib)(display, *c, EGL_GREEN_SIZE as _, &mut g) == 1
             && (egl.eglGetConfigAttrib)(display, *c, EGL_BLUE_SIZE as _, &mut b) == 1
             && (egl.eglGetConfigAttrib)(display, *c, EGL_ALPHA_SIZE as _, &mut a) == 1
             && (egl.eglGetConfigAttrib)(display, *c, EGL_DEPTH_SIZE as _, &mut d) == 1
+            && (egl.eglGetConfigAttrib)(display, *c, EGL_SAMPLES as _, &mut s) == 1
+            && (egl.eglGetConfigAttrib)(display, *c, EGL_SAMPLE_BUFFERS as _, &mut sb) == 1
             && r == 8
             && g == 8
             && b == 8
             && (alpha_size == 0 || a == alpha_size as _)
             && d == 16
+            && (sample_count > 1 || (sb == 0 && s == 0))
         {
             exact_cfg_found = true;
             config = *c;

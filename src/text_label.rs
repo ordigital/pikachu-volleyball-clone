@@ -7,10 +7,15 @@ use std::{cell::RefCell, rc::Rc};
 const FONT_SIZE: u16 = 96;
 
 pub fn outline_material() -> Material {
+    let fragment = if crate::texture::is_low_end_device() {
+        include_str!("../assets/shaders/outline_fast.frag")
+    } else {
+        include_str!("../assets/shaders/outline.frag")
+    };
     load_material(
         ShaderSource::Glsl {
             vertex: crate::rendering::VERTEX,
-            fragment: include_str!("../assets/shaders/outline.frag"),
+            fragment,
         },
         MaterialParams {
             pipeline_params: crate::rendering::source_over(),
@@ -84,14 +89,20 @@ impl TextLabel {
 
     pub fn draw(&self, origin: Vec2, size: Vec2, style: TextStyle, alpha: f32) {
         let mut raster = self.raster.borrow_mut();
-        let physical_scale = crate::rendering::scene_scale(
-            (screen_width() / crate::scene::WIDTH).min(screen_height() / crate::scene::HEIGHT),
-            screen_dpi_scale(),
-        ) as f32;
+        let low_end = crate::texture::is_low_end_device();
+        let physical_scale = if low_end {
+            (screen_width() / crate::scene::WIDTH).min(screen_height() / crate::scene::HEIGHT)
+        } else {
+            crate::rendering::scene_scale(
+                (screen_width() / crate::scene::WIDTH).min(screen_height() / crate::scene::HEIGHT),
+                screen_dpi_scale(),
+            ) as f32
+        };
         let fit =
             (size.x / raster.glyph_size.x.max(1.0)).min(size.y / raster.glyph_size.y.max(1.0));
         let needed = raster.font_size as f32 * fit * physical_scale;
-        let font_size = cache_font_size(raster.font_size, needed);
+        let max_bucket = if low_end { 384 } else { 1536 };
+        let font_size = cache_font_size(raster.font_size, needed, max_bucket);
         if font_size != raster.font_size {
             *raster = Raster::new(&self.text, &self.font, font_size);
         }
@@ -100,6 +111,7 @@ impl TextLabel {
         let texture_size = raster.target.texture.size();
         let position =
             origin + (size - raster.glyph_size * scale) / 2.0 - Vec2::splat(raster.padding * scale);
+
         self.material.set_uniform(
             "OutlineUv",
             vec2(
@@ -128,12 +140,12 @@ impl TextLabel {
 }
 
 // Cache tylko rośnie i używa progów 96/192/384/768/1536, zamiast co klatkę.
-fn cache_font_size(current: u16, needed: f32) -> u16 {
+fn cache_font_size(current: u16, needed: f32, max_size: u16) -> u16 {
     let mut size = current;
-    while (size as f32) < needed && size < 1536 {
+    while (size as f32) < needed && size < max_size {
         size *= 2;
     }
-    size
+    size.min(max_size)
 }
 
 #[cfg(test)]
@@ -142,9 +154,10 @@ mod tests {
 
     #[test]
     fn font_cache_covers_physical_size_without_resize_churn() {
-        assert_eq!(cache_font_size(96, 256.0), 384);
-        assert_eq!(cache_font_size(384, 260.0), 384);
-        assert_eq!(cache_font_size(384, 80.0), 384);
-        assert_eq!(cache_font_size(96, 1100.0), 1536);
+        assert_eq!(cache_font_size(96, 256.0, 1536), 384);
+        assert_eq!(cache_font_size(384, 260.0, 1536), 384);
+        assert_eq!(cache_font_size(384, 80.0, 1536), 384);
+        assert_eq!(cache_font_size(96, 1100.0, 1536), 1536);
+        assert_eq!(cache_font_size(96, 1100.0, 384), 384);
     }
 }

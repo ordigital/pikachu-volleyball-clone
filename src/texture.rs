@@ -30,6 +30,67 @@ pub fn load(bytes: &[u8]) -> Texture2D {
     }
 }
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
+static IS_LOW_END: AtomicBool = AtomicBool::new(false);
+
+pub fn init_device_profile() {
+    #[allow(unused_mut)]
+    let mut low_end = false;
+    #[cfg(target_os = "android")]
+    {
+        let max_tex = max_texture_size();
+        let renderer = gl_renderer().to_ascii_lowercase();
+        if max_tex < 4452
+            || renderer.contains("adreno (tm) 30")
+            || renderer.contains("adreno 30")
+            || renderer.contains("mali-400")
+            || renderer.contains("mali-450")
+            || renderer.contains("mali-t720")
+        {
+            low_end = true;
+        }
+    }
+    IS_LOW_END.store(low_end, Ordering::Relaxed);
+}
+
+pub fn is_low_end_device() -> bool {
+    IS_LOW_END.load(Ordering::Relaxed)
+}
+
+pub fn max_texture_size() -> i32 {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let mut size: i32 = 0;
+        unsafe {
+            macroquad::miniquad::native::gl::glGetIntegerv(
+                macroquad::miniquad::native::gl::GL_MAX_TEXTURE_SIZE,
+                &mut size,
+            );
+        }
+        if size > 0 {
+            return size;
+        }
+    }
+    4096
+}
+
+#[allow(dead_code)]
+pub fn gl_renderer() -> String {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        unsafe {
+            let ptr = macroquad::miniquad::native::gl::glGetString(0x1F01);
+            if !ptr.is_null() {
+                if let Ok(s) = std::ffi::CStr::from_ptr(ptr.cast()).to_str() {
+                    return s.to_owned();
+                }
+            }
+        }
+    }
+    String::new()
+}
+
 #[cfg(test)]
 mod tests {
     use super::decode_webp;

@@ -16,24 +16,27 @@ fn sphere_color(base: Vec3, point: Vec2, brightness: f32, alpha: f32) -> Color {
 }
 
 fn ball_mesh(center: Vec2, radius: f32, rotation: f32, brightness: f32, alpha: f32) -> Mesh {
-    const RINGS: usize = 12;
-    const SECTORS: usize = 64;
+    let (rings, sectors) = if crate::texture::is_low_end_device() {
+        (2, 16)
+    } else {
+        (12, 64)
+    };
     let mut mesh = Mesh {
-        vertices: Vec::with_capacity(RINGS * SECTORS * 4),
-        indices: Vec::with_capacity(RINGS * SECTORS * 6),
+        vertices: Vec::with_capacity(rings * sectors * 4),
+        indices: Vec::with_capacity(rings * sectors * 6),
         texture: None,
     };
-    for sector in 0..SECTORS {
-        let base = if sector < SECTORS / 2 {
+    for sector in 0..sectors {
+        let base = if sector < sectors / 2 {
             vec3(0.98, 0.985, 1.0)
         } else {
             vec3(0.96, 0.035, 0.025)
         };
-        let angle = rotation + sector as f32 * std::f32::consts::TAU / SECTORS as f32;
-        let next = angle + std::f32::consts::TAU / SECTORS as f32;
-        for ring in 0..RINGS {
-            let inner = ring as f32 / RINGS as f32;
-            let outer = (ring + 1) as f32 / RINGS as f32;
+        let angle = rotation + sector as f32 * std::f32::consts::TAU / sectors as f32;
+        let next = angle + std::f32::consts::TAU / sectors as f32;
+        for ring in 0..rings {
+            let inner = ring as f32 / rings as f32;
+            let outer = (ring + 1) as f32 / rings as f32;
             let n = mesh.vertices.len() as u16;
             for (a, r) in [(angle, inner), (next, inner), (next, outer), (angle, outer)] {
                 let point = vec2(a.cos(), a.sin()) * r;
@@ -55,11 +58,13 @@ fn ball_mesh(center: Vec2, radius: f32, rotation: f32, brightness: f32, alpha: f
 }
 
 fn draw_ball_surface(center: Vec2, radius: f32, rotation: f32, brightness: f32, alpha: f32) {
+    let low_end = crate::texture::is_low_end_device();
+    let sectors = if low_end { 16 } else { 64 };
     let black = Color::new(0.13, 0.14, 0.17, alpha);
     draw_poly_lines(
         center.x,
         center.y,
-        64,
+        sectors,
         radius * 0.955,
         rotation.to_degrees(),
         radius * 0.045,
@@ -78,7 +83,7 @@ fn draw_ball_surface(center: Vec2, radius: f32, rotation: f32, brightness: f32, 
     draw_poly_lines(
         center.x,
         center.y,
-        64,
+        sectors,
         radius * 0.20,
         0.0,
         radius * 0.05,
@@ -87,7 +92,7 @@ fn draw_ball_surface(center: Vec2, radius: f32, rotation: f32, brightness: f32, 
     draw_poly(
         center.x,
         center.y,
-        64,
+        sectors,
         radius * 0.20,
         0.0,
         Color::new(0.96, 0.97, 1.0, alpha),
@@ -95,17 +100,20 @@ fn draw_ball_surface(center: Vec2, radius: f32, rotation: f32, brightness: f32, 
 }
 
 fn highlight_mesh(center: Vec2, radius: f32, alpha: f32) -> Mesh {
-    const RINGS: usize = 12;
-    const SECTORS: usize = 48;
+    let (rings, sectors) = if crate::texture::is_low_end_device() {
+        (2, 12)
+    } else {
+        (12, 48)
+    };
     let mut mesh = Mesh {
-        vertices: Vec::with_capacity(RINGS * SECTORS * 4),
-        indices: Vec::with_capacity(RINGS * SECTORS * 6),
+        vertices: Vec::with_capacity(rings * sectors * 4),
+        indices: Vec::with_capacity(rings * sectors * 6),
         texture: None,
     };
     let center = center + vec2(-0.52, -0.56) * radius;
     let angle: f32 = -35.0_f32.to_radians();
-    for ring in 0..RINGS {
-        for sector in 0..SECTORS {
+    for ring in 0..rings {
+        for sector in 0..sectors {
             let n = mesh.vertices.len() as u16;
             for (r, a) in [
                 (ring, sector),
@@ -113,8 +121,8 @@ fn highlight_mesh(center: Vec2, radius: f32, alpha: f32) -> Mesh {
                 (ring + 1, sector + 1),
                 (ring, sector + 1),
             ] {
-                let r = r as f32 / RINGS as f32;
-                let a = a as f32 * std::f32::consts::TAU / SECTORS as f32;
+                let r = r as f32 / rings as f32;
+                let a = a as f32 * std::f32::consts::TAU / sectors as f32;
                 let p = vec2(a.cos() * 0.16, a.sin() * 0.11) * radius * r;
                 let p = center
                     + vec2(
@@ -175,19 +183,64 @@ pub fn draw_ball(
     }
 }
 
+fn shadow_texture() -> Texture2D {
+    static TEX: std::sync::OnceLock<Texture2D> = std::sync::OnceLock::new();
+    TEX.get_or_init(|| {
+        const SIZE: usize = 64;
+        let mut bytes = [0u8; SIZE * SIZE * 4];
+        let half = (SIZE as f32) * 0.5;
+        for y in 0..SIZE {
+            for x in 0..SIZE {
+                let dx = (x as f32 + 0.5 - half) / half;
+                let dy = (y as f32 + 0.5 - half) / half;
+                let r = (dx * dx + dy * dy).sqrt();
+                if r < 1.0 {
+                    let falloff = (1.0 - r).clamp(0.0, 1.0);
+                    let opacity = 0.25 * (falloff * falloff * (3.0 - 2.0 * falloff));
+                    let idx = (y * SIZE + x) * 4;
+                    bytes[idx] = (0.26 * 255.0) as u8;
+                    bytes[idx + 1] = (0.20 * 255.0) as u8;
+                    bytes[idx + 2] = (0.40 * 255.0) as u8;
+                    bytes[idx + 3] = (opacity * 255.0) as u8;
+                }
+            }
+        }
+        let tex = Texture2D::from_rgba8(SIZE as u16, SIZE as u16, &bytes);
+        tex.set_filter(FilterMode::Linear);
+        tex
+    })
+    .clone()
+}
+
 pub fn draw_shadow(center: Vec2, size: Vec2, alpha: f32) {
-    // Warstwy tworzą łagodne brzegi; łączna nieprzezroczystość ~25%, nie 65%.
-    for i in 0..10 {
-        let p = i as f32 / 10.0;
-        let scale = 1.0 - p * 0.55;
-        draw_ellipse(
-            center.x,
-            center.y,
-            size.x * 0.5 * scale,
-            size.y * 0.5 * scale,
-            0.0,
-            Color::new(0.26, 0.20, 0.40, alpha * (0.012 + p * 0.035)),
+    if crate::texture::is_low_end_device() {
+        let tex = shadow_texture();
+        let left = center.x - size.x * 0.5;
+        let top = center.y - size.y * 0.5;
+        draw_texture_ex(
+            &tex,
+            left,
+            top,
+            Color::new(1.0, 1.0, 1.0, alpha),
+            DrawTextureParams {
+                dest_size: Some(size),
+                ..Default::default()
+            },
         );
+    } else {
+        // Warstwy tworzą łagodne brzegi; łączna nieprzezroczystość ~25%, nie 65%.
+        for i in 0..10 {
+            let p = i as f32 / 10.0;
+            let scale = 1.0 - p * 0.55;
+            draw_ellipse(
+                center.x,
+                center.y,
+                size.x * 0.5 * scale,
+                size.y * 0.5 * scale,
+                0.0,
+                Color::new(0.26, 0.20, 0.40, alpha * (0.012 + p * 0.035)),
+            );
+        }
     }
 }
 
@@ -278,8 +331,45 @@ impl SandBurst {
         if progress >= 1.0 {
             return;
         }
+        let low_end = crate::texture::is_low_end_device();
+        if low_end {
+            for i in 0..16 {
+                let r1 = particle_random(i, 1);
+                let r2 = particle_random(i, 2);
+                let r3 = particle_random(i, 3);
+                let delay = r3 * 0.18;
+                let age = ((progress - delay) / (1.0 - delay)).clamp(0.0, 1.0);
+                if progress < delay || age >= 1.0 {
+                    continue;
+                }
+                let origin_x = (r1 * 2.0 - 1.0) * 20.0;
+                let velocity_x = (r2 * 2.0 - 1.0) * 35.0 + origin_x * 0.35;
+                let height = 16.0 + r3 * 38.0;
+                let position = self.center
+                    + vec2(
+                        origin_x + velocity_x * age,
+                        -height * 4.0 * age * (1.0 - age),
+                    ) * self.scale;
+                let fade = (1.0 - age).powf(1.2);
+                let radius = (0.6 + r2 * 1.1) * self.scale;
+                let color = match i % 3 {
+                    0 => vec3(0.85, 0.68, 0.47),
+                    1 => vec3(0.68, 0.48, 0.31),
+                    _ => vec3(0.96, 0.82, 0.62),
+                };
+                draw_rectangle(
+                    position.x - radius,
+                    position.y - radius,
+                    radius * 2.0,
+                    radius * 2.0,
+                    Color::new(color.x, color.y, color.z, fade * 0.70),
+                );
+            }
+            return;
+        }
         draw_mesh(&sand_dust_mesh(self.center, progress, self.scale));
-        for i in 0..110 {
+        let particle_count = 110;
+        for i in 0..particle_count {
             let r1 = particle_random(i, 1);
             let r2 = particle_random(i, 2);
             let r3 = particle_random(i, 3);
@@ -332,8 +422,11 @@ pub(crate) fn particle_random(index: u32, seed: u32) -> f32 {
 }
 
 fn sand_dust_mesh(center: Vec2, progress: f32, scale: f32) -> Mesh {
-    const RINGS: usize = 6;
-    const SECTORS: usize = 16;
+    let (rings, sectors) = if crate::texture::is_low_end_device() {
+        (3, 8)
+    } else {
+        (6, 16)
+    };
     let mut mesh = Mesh {
         vertices: Vec::new(),
         indices: Vec::new(),
@@ -348,8 +441,8 @@ fn sand_dust_mesh(center: Vec2, progress: f32, scale: f32) -> Mesh {
                 -progress * (8.0 + (cloud % 3) as f32 * 4.0),
             ) * scale;
         let radius = (5.0 + progress * (11.0 + (cloud % 3) as f32 * 3.0)) * scale;
-        for ring in 0..RINGS {
-            for sector in 0..SECTORS {
+        for ring in 0..rings {
+            for sector in 0..sectors {
                 let start = mesh.vertices.len() as u16;
                 for (r, a) in [
                     (ring, sector),
@@ -357,8 +450,8 @@ fn sand_dust_mesh(center: Vec2, progress: f32, scale: f32) -> Mesh {
                     (ring + 1, sector + 1),
                     (ring, sector + 1),
                 ] {
-                    let fraction = r as f32 / RINGS as f32;
-                    let angle = a as f32 * std::f32::consts::TAU / SECTORS as f32;
+                    let fraction = r as f32 / rings as f32;
+                    let angle = a as f32 * std::f32::consts::TAU / sectors as f32;
                     let pos = origin + vec2(angle.cos(), angle.sin() * 0.65) * radius * fraction;
                     let alpha = life * 0.11 * (1.0 - fraction * fraction).powi(2);
                     mesh.vertices.push(Vertex::new(
@@ -424,8 +517,11 @@ impl BallTrail {
     // A jittering label reverses direction too quickly for a smooth ribbon.
     // Radial samples preserve the ball smoke's color and lifetime without folds.
     fn smoke_cloud_mesh(&self, head: Vec2, t: f32) -> Mesh {
-        const RINGS: usize = 6;
-        const SECTORS: usize = 16;
+        let (rings, sectors) = if crate::texture::is_low_end_device() {
+            (3, 8)
+        } else {
+            (6, 16)
+        };
         let mut mesh = Mesh {
             vertices: Vec::new(),
             indices: Vec::new(),
@@ -436,8 +532,8 @@ impl BallTrail {
             let position = if i == last { head } else { point.position };
             let life = trail_life(point.age, t);
             let radius = 30.0 * life;
-            for ring in 0..RINGS {
-                for sector in 0..SECTORS {
+            for ring in 0..rings {
+                for sector in 0..sectors {
                     let start = mesh.vertices.len() as u16;
                     for (r, a) in [
                         (ring, sector),
@@ -445,8 +541,8 @@ impl BallTrail {
                         (ring + 1, sector + 1),
                         (ring, sector + 1),
                     ] {
-                        let fraction = r as f32 / RINGS as f32;
-                        let angle = a as f32 * std::f32::consts::TAU / SECTORS as f32;
+                        let fraction = r as f32 / rings as f32;
+                        let angle = a as f32 * std::f32::consts::TAU / sectors as f32;
                         let p = position + vec2(angle.cos(), angle.sin()) * radius * fraction;
                         let alpha = 0.16 * life.powi(3) * (1.0 - fraction * fraction).powi(2);
                         mesh.vertices.push(Vertex::new(
@@ -490,22 +586,25 @@ impl BallTrail {
 
     pub fn draw_smoke(&self, head: Vec2, t: f32) {
         let last = self.points.len().saturating_sub(1);
-        // Jedna wstęga zamiast nakładających się addytywnych kół i pasów.
-        // Alfa w osi przy piłce wynosi 75%, a starszy ślad szybko zanika.
+        let low_end = crate::texture::is_low_end_device();
         let mut smoke = Mesh {
             vertices: Vec::new(),
             indices: Vec::new(),
             texture: None,
         };
-        const PROFILE: [(f32, f32); 7] = [
-            (-1.0, 0.0),
-            (-0.8, 0.04),
-            (-0.55, 0.16),
-            (0.0, 1.0),
-            (0.55, 0.16),
-            (0.8, 0.04),
-            (1.0, 0.0),
-        ];
+        let profile: &[(f32, f32)] = if low_end {
+            &[(-1.0, 0.0), (0.0, 1.0), (1.0, 0.0)]
+        } else {
+            &[
+                (-1.0, 0.0),
+                (-0.8, 0.04),
+                (-0.55, 0.16),
+                (0.0, 1.0),
+                (0.55, 0.16),
+                (0.8, 0.04),
+                (1.0, 0.0),
+            ]
+        };
         for i in 0..=last {
             let Some(point) = self.points.get(i) else {
                 break;
@@ -524,7 +623,7 @@ impl BallTrail {
             let direction = (next - previous).normalize_or_zero();
             let normal = vec2(-direction.y, direction.x);
             let life = trail_life(point.age, t);
-            for (offset, coverage) in PROFILE {
+            for &(offset, coverage) in profile {
                 let p = position + normal * offset * 36.0 * life;
                 smoke.vertices.push(Vertex::new(
                     p.x,
@@ -536,9 +635,9 @@ impl BallTrail {
                 ));
             }
             if i > 0 {
-                for j in 0..PROFILE.len() - 1 {
-                    let a = ((i - 1) * PROFILE.len() + j) as u16;
-                    let b = (i * PROFILE.len() + j) as u16;
+                for j in 0..profile.len() - 1 {
+                    let a = ((i - 1) * profile.len() + j) as u16;
+                    let b = (i * profile.len() + j) as u16;
                     smoke
                         .indices
                         .extend_from_slice(&[a, b, b + 1, a, b + 1, a + 1]);
@@ -552,7 +651,10 @@ impl BallTrail {
     pub fn draw(&self, head: Vec2, radius: f32, t: f32, light: &Material) {
         self.draw_smoke(head, t);
         let last = self.points.len().saturating_sub(1);
-        gl_use_material(light);
+        let low_end = crate::texture::is_low_end_device();
+        if !low_end {
+            gl_use_material(light);
+        }
         // Wtórne obrazy mają rzeczywisty kształt/wzór piłki, nie kształt dymu.
         // Od najstarszego do najnowszego, z płynnym zanikiem i interpolacją pozycji.
         for i in 0..last {
@@ -563,10 +665,81 @@ impl BallTrail {
             let rotation =
                 crate::gfx::lerp_rotation(point.rotation as f64, next.rotation as f64, t as f64)
                     as f32;
-            draw_ball_surface(position, radius, rotation, 1.4, 0.42 * life.powf(1.5));
+            let alpha = 0.42 * life.powf(1.5);
+            if low_end {
+                draw_ghost_ball(position, radius, rotation, alpha);
+            } else {
+                draw_ball_surface(position, radius, rotation, 1.4, alpha);
+            }
         }
-        gl_use_default_material();
+        if !low_end {
+            gl_use_default_material();
+        }
     }
+}
+
+fn ghost_ball_texture() -> Texture2D {
+    static TEX: std::sync::OnceLock<Texture2D> = std::sync::OnceLock::new();
+    TEX.get_or_init(|| {
+        const SIZE: usize = 64;
+        let mut bytes = [0u8; SIZE * SIZE * 4];
+        let half = (SIZE as f32) * 0.5;
+        let radius = half - 1.0;
+        for y in 0..SIZE {
+            for x in 0..SIZE {
+                let dx = (x as f32 + 0.5 - half) / radius;
+                let dy = (y as f32 + 0.5 - half) / radius;
+                let r2 = dx * dx + dy * dy;
+                if r2 > 1.0 {
+                    continue;
+                }
+                let r = r2.sqrt();
+                let edge_alpha = ((1.0 - r) * radius).clamp(0.0, 1.0);
+                let is_rim = r > 0.91;
+                let is_belt = dy.abs() < 0.08 && r <= 0.91;
+                let button_r = (dx * dx + dy * dy).sqrt();
+                let is_btn_outer = button_r < 0.28;
+                let is_btn_inner = button_r < 0.16;
+
+                let (red, green, blue) = if is_rim || is_belt || (is_btn_outer && !is_btn_inner) {
+                    (33, 36, 43)
+                } else if is_btn_inner {
+                    (245, 245, 245)
+                } else if dy < 0.0 {
+                    (245, 9, 6)
+                } else {
+                    (245, 245, 245)
+                };
+
+                let idx = (y * SIZE + x) * 4;
+                bytes[idx] = red;
+                bytes[idx + 1] = green;
+                bytes[idx + 2] = blue;
+                bytes[idx + 3] = (edge_alpha * 255.0) as u8;
+            }
+        }
+        let tex = Texture2D::from_rgba8(SIZE as u16, SIZE as u16, &bytes);
+        tex.set_filter(FilterMode::Linear);
+        tex
+    })
+    .clone()
+}
+
+fn draw_ghost_ball(center: Vec2, radius: f32, rotation: f32, alpha: f32) {
+    let tex = ghost_ball_texture();
+    let size = vec2(radius * 2.0, radius * 2.0);
+    draw_texture_ex(
+        &tex,
+        center.x - radius,
+        center.y - radius,
+        Color::new(1.0, 1.0, 1.0, alpha),
+        DrawTextureParams {
+            dest_size: Some(size),
+            rotation,
+            pivot: Some(center),
+            ..Default::default()
+        },
+    );
 }
 
 #[cfg(test)]
