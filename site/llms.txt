@@ -5,7 +5,7 @@
 Platforms: Linux (x86-64 and ARM64 AppImage), Windows x64, Android 5.0+, a WebAssembly browser version, and independent ports for the Sega Mega Drive / Genesis and the NES. The project is open source; the starting point was the browser implementation by gorisanson.
 
 ## Play and download
-- [Website (play in the browser, downloads)](https://ordigital.github.io/pikachu-volleyball-clone/): landing page in English, with translations at /pl/, /de/, /fr/, /es/, /it/, /uk/, /ru/ and /hu/
+- [Website (play in the browser, downloads)](https://pikachu.adamstrad.pl/): landing page in English, with translations at /pl/, /de/, /fr/, /es/, /it/, /uk/, /ru/ and /hu/
 - [Latest release](https://github.com/ordigital/pikachu-volleyball-clone/releases/latest): AppImages, Windows ZIP, Android APK, Mega Drive and NES ROMs, SHA256SUMS.txt
 
 ## Source and documentation

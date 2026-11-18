@@ -12,7 +12,7 @@ SACHI SOFT / SAWAYAKAN Programmers and Satoshi Takenouchi. This remake adds
 a widescreen court, redesigned menus, keyboard and gamepad support, and an
 Android version with invisible touch controls.
 
-**Website and online demo: https://ordigital.github.io/pikachu-volleyball-clone/**
+**Website and online demo: https://pikachu.adamstrad.pl/**
 
 ## Downloads
 
@@ -163,7 +163,7 @@ A running copy is embedded on the project website. It uses a small Web Audio lay
 sound, has no menu bar (the title screen has an **About / controls** entry) and uses
 the default keys only; there is no gamepad support yet. Run `./ports/browser/build.sh`
 (needs `rustup target add wasm32-unknown-unknown`) and serve `ports/browser/dist/` with
-any static web server; `./ports/browser/build.sh publish` also copies it to `docs/play/`.
+any static web server; `./ports/browser/build.sh publish` also copies it to `site/play/`.
 Touch works on phones, but it has not been tested on real devices or in Safari.
 
 ## Credits

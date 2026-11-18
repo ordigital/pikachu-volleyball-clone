@@ -12,3 +12,4 @@ ports/browser/dist/
 
 # Local release packages
 /release/
+.ftp

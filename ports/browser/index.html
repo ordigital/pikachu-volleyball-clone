@@ -14,11 +14,14 @@ html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
 #start strong { font-size: 30px; color: #ffe000; }
 #start small { font-weight: 400; font-size: 15px; opacity: .85; }
 #start[hidden] { display: none; }
+#bar { width: min(320px, 70vw); height: 10px; border-radius: 5px; background: rgba(255,255,255,.2); overflow: hidden; }
+#bar[hidden] { display: none; }
+#fill { height: 100%; width: 0; background: #ffe000; transition: width .15s linear; }
 </style>
 </head>
 <body>
 <canvas id="glcanvas" tabindex="1"></canvas>
-<div id="start"><strong>Pikachu Volleyball Clone</strong><span id="start-text">Loading…</span><small>Click, tap or press a key to start</small></div>
+<div id="start"><strong>Pikachu Volleyball Clone</strong><span id="start-text">Click or tap to play</span><div id="bar" hidden><div id="fill"></div></div><small id="start-hint"></small></div>
 <script src="gl.js"></script>
 <script src="pika_audio.js"></script>
 <script>
@@ -26,13 +29,28 @@ html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
 (function () {
     var overlay = document.getElementById("start");
     var text = document.getElementById("start-text");
+    var bar = document.getElementById("bar");
+    var fill = document.getElementById("fill");
+    var hint = document.getElementById("start-hint");
+    var WASM_BYTES = __WASM_BYTES__;
     var started = false;
+    hint.textContent = "The game (about " + Math.round(WASM_BYTES / 1e6) + " MB) downloads when you start";
+    // The wasm is downloaded only after the first click/tap/key, so an embedded page costs nothing until played.
+    function begin() {
+        started = true;
+        text.textContent = "Loading… 0%";
+        hint.hidden = true;
+        bar.hidden = false;
+        load("pikachu-volleyball.wasm", function (bytes) {
+            var pct = Math.min(99, Math.floor(100 * bytes / WASM_BYTES));
+            fill.style.width = pct + "%";
+            text.textContent = bytes >= WASM_BYTES ? "Starting…" : "Loading… " + pct + "%";
+        });
+    }
+    window.pika_on_loaded = function () { overlay.hidden = true; };
     function unlock() {
         if (window.pika_audio_unlock) window.pika_audio_unlock();
-        if (!started) {
-            started = true;
-            overlay.hidden = true;
-        }
+        if (!started) begin();
         // Inside an iframe the click would otherwise leave focus on the page body.
         window.focus();
         canvas.focus();
@@ -41,7 +59,6 @@ html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
     ["pointerdown", "pointerup", "click", "touchend", "keydown"].forEach(function (name) {
         window.addEventListener(name, unlock, true);
     });
-    text.textContent = "Ready";
     // F11 and Alt+Enter toggle full screen of the page (the game itself has no menu bar here).
     window.addEventListener("keydown", function (event) {
         if (event.key === "F11" || (event.altKey && event.key === "Enter")) {
@@ -84,6 +101,7 @@ html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
                 }, op[0]);
             });
         }
+        begin();
         setTimeout(function () {
             overlay.hidden = true;
             setTimeout(function () {
@@ -96,7 +114,6 @@ html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
             }, 400);
         }, parseInt(match[1], 10));
     }
-    load("pikachu-volleyball.wasm");
 })();
 </script>
 </body>

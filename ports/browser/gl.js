@@ -1526,8 +1526,27 @@ function add_missing_functions_stabs(obj) {
     }
 }
 
-function load(wasm_path) {
-    var req = fetch(wasm_path);
+// Counts the (decoded) bytes of a streamed response; the wasm is compiled while it downloads.
+function with_progress(response, on_progress) {
+    if (!on_progress || !response.body) return response;
+    var reader = response.body.getReader();
+    var received = 0;
+    var stream = new ReadableStream({
+        pull: function (controller) {
+            return reader.read().then(function (chunk) {
+                if (chunk.done) { controller.close(); return; }
+                received += chunk.value.length;
+                on_progress(received);
+                controller.enqueue(chunk.value);
+            });
+        },
+        cancel: function (reason) { return reader.cancel(reason); }
+    });
+    return new Response(stream, { status: response.status, headers: response.headers });
+}
+
+function load(wasm_path, on_progress) {
+    var req = fetch(wasm_path).then(function (response) { return with_progress(response, on_progress); });
 
     register_plugins(plugins);
 
@@ -1550,6 +1569,7 @@ function load(wasm_path) {
                     }
                     init_plugins(plugins);
                     obj.exports.main();
+                    if (window.pika_on_loaded) window.pika_on_loaded();
                 })
             .catch(err => {
                 console.error(err);
@@ -1574,6 +1594,7 @@ function load(wasm_path) {
                 }
                 init_plugins(plugins);
                 obj.exports.main();
+                    if (window.pika_on_loaded) window.pika_on_loaded();
             })
             .catch(err => {
                 console.error("WASM failed to load, probably incompatible gl.js version");
